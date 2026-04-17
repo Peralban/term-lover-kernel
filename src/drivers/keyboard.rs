@@ -2,6 +2,7 @@
 use x86_64::instructions::port::Port;
 use x86_64::structures::idt::InterruptStackFrame;
 use crate::events::events::Event;
+use crate::events::events::InputEvent;
 use crate::EVENT_QUEUE;
 
 pub extern "x86-interrupt" fn keyboard_handler(
@@ -23,12 +24,16 @@ static mut KEYBOARD_STATE: KeyboardState = KeyboardState {
     shift: false,
     ctrl: false,
     alt: false,
+    extended: false,
+    super_key: false,
 };
 
 pub struct KeyboardState {
     shift: bool,
     ctrl: bool,
     alt: bool,
+    extended: bool,
+    super_key: bool,
 }
 
 #[derive(Copy, Clone)]
@@ -37,6 +42,7 @@ pub struct Modifiers {
     pub ctrl: bool,
     pub alt: bool,
     pub super_key: bool,
+    pub extended: bool,
 }
 
 #[derive(Copy, Clone)]
@@ -47,32 +53,57 @@ pub struct KeyEvent {
 
 fn from_scancode(scancode: u8) -> Option<Event> {
     unsafe {
-        match scancode {
+        match scancode { // todo Delete ca et handle release
             0x2A => { KEYBOARD_STATE.shift = true; return None; } // shift press
             0xAA => { KEYBOARD_STATE.shift = false; return None; } // shift release
             0x1D => { KEYBOARD_STATE.ctrl = true; return None; } // ctrl press
             0x9D => { KEYBOARD_STATE.ctrl = false; return None; } // ctrl release
             0x38 => { KEYBOARD_STATE.alt = true; return None; } // alt press
             0xB8 => { KEYBOARD_STATE.alt = false; return None; } // alt release
+            0xE0 => { KEYBOARD_STATE.extended = true; return None; } // extended
 
             _ => {}
         }
 
-        let key = decode_key(scancode);
+        if KEYBOARD_STATE.extended {
+            KEYBOARD_STATE.extended = false;
+            match scancode {
+                0x5B => { KEYBOARD_STATE.super_key = true; return None; } // super key press
+                0xDB => { KEYBOARD_STATE.super_key = false; return None; } // super key release
+                _ => {}
+            }
+            let extended_key = decode_pressed_extended_key(scancode);
+            if extended_key != 0 {
+                return Some(Event::Input(InputEvent::KeyPress(KeyEvent {
+                    key: extended_key,
+                    mods: Modifiers {
+                        shift: KEYBOARD_STATE.shift,
+                        ctrl: KEYBOARD_STATE.ctrl,
+                        alt: KEYBOARD_STATE.alt,
+                        super_key: KEYBOARD_STATE.super_key,
+                        extended: true,
+                    }
+                })));
+            }
+            return None;    
+        }
 
-        Some(Event::KeyPress(KeyEvent {
+        let key = decode_pressed_key(scancode);
+
+        Some(Event::Input(InputEvent::KeyPress(KeyEvent {
             key,
             mods: Modifiers {
                 shift: KEYBOARD_STATE.shift,
                 ctrl: KEYBOARD_STATE.ctrl,
                 alt: KEYBOARD_STATE.alt,
-                super_key: false,
+                super_key: KEYBOARD_STATE.super_key,
+                extended: false,
             }
-        }))
+        })))
     }
 }
 
-fn decode_key(scancode: u8) -> u8 {
+fn decode_pressed_key(scancode: u8) -> u8 {
     match scancode {
         // Number row
         0x02 => b'1',
@@ -124,11 +155,32 @@ fn decode_key(scancode: u8) -> u8 {
         0x33 => b',',
         0x34 => b'.',
         0x35 => b'/',
-        // Special keys
+        // Space and enter
         0x39 => b' ',
-        0x0f => b'\t',  // Tab
+        0x1c => b'\n',
+        _ => 0,
+    }
+}
+
+fn decode_pressed_extended_key(scancode: u8) -> u8 {
+    match scancode {
+        // numpad keys
+        0x35 => b'/',  // Numpad slash
+        0x37 => b'*',  // Numpad asterisk
+        0x38 => b'-',  // Numpad minus
+        0x39 => b'+',  // Numpad plus
+        // arrow keys
+        0x48 => b'U',  // Up arrow
+        0x50 => b'D',  // Down arrow
+        0x4b => b'L',  // Left arrow
+        0x4d => b'R',  // Right arrow
+        // other
         0x1c => b'\n', // Enter
-        0x29 => b'`',  // Backtick
+        0x1d => b'\t', // Tab
+        0x47 => b'H',  // Home
+        0x4f => b'E',  // End
+        0x49 => b'P',  // Page Up
+        0x51 => b'N',  // Page Down
         _ => 0,
     }
 }

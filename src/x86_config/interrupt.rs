@@ -1,6 +1,6 @@
 
 use x86_64::structures::idt::InterruptDescriptorTable;
-use crate::events::keyboard::keyboard_handler;
+use crate::drivers::keyboard::keyboard_handler;
 
 static mut IDT: InterruptDescriptorTable = InterruptDescriptorTable::new();
 

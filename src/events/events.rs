@@ -1,14 +1,37 @@
 
-use crate::events::keyboard::KeyEvent;
+use crate::{drivers::keyboard::KeyEvent, session::{desktop::{content::app_manager::AppEvent, desktop::DesktopEvent}, session::SessionEvent}};
 use x86_64::instructions::interrupts;
 
 #[derive(Copy, Clone)]
-pub enum Event {
+pub enum InputEvent { // futur peut etre que ca a term ca va devenir Keyboard et Mouth et les key event enum seront decla et mise dans keyboard 
     KeyPress(KeyEvent),
     KeyRelease(KeyEvent),
-    //MouseMove { x: i32, y: i32 },
-    //MouseClick { button: u8 },
-    //Interrupt(u8),
+}
+
+#[derive(Copy, Clone)]
+pub enum UiEvent {
+    Session(SessionEvent),
+    Desktop(DesktopEvent),
+    App(AppEvent),
+}
+
+#[derive(Copy, Clone)]
+pub enum Event {
+    Input(InputEvent),
+    UI(UiEvent),
+}
+
+
+#[derive(Copy, Clone)]
+pub enum Event_Return {
+    NoVisualChange = 0,
+    VisualChange = 1,
+}
+
+impl Event_Return {
+    pub fn as_bool(self) -> bool {
+        matches!(self, Self::VisualChange)
+    }
 }
 
 
