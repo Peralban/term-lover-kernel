@@ -8,7 +8,12 @@ SECTIONS {
     .rodata : { *(.rodata .rodata.*) }
 
     . = ALIGN(4K);
-    .data : { *(.data .data.*) }
+    .data : {
+        *(.data .data.*)
+        *(.got .got.*)
+        *(.got.plt)
+    }
+
 
     . = ALIGN(4K);
     .commands : {
