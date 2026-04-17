@@ -12,9 +12,7 @@ pub extern "x86-interrupt" fn keyboard_handler(
         data.read()
     };
 
-    unsafe {
-        EVENT_QUEUE.push(from_scancode(scancode));
-    }
+    EVENT_QUEUE.lock().push(from_scancode(scancode));
 
     unsafe {
         Port::new(0x20).write(0x20u8); // EOI

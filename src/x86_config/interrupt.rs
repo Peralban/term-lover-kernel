@@ -6,7 +6,10 @@ static mut IDT: InterruptDescriptorTable = InterruptDescriptorTable::new();
 
 pub fn init_idt() {
     unsafe {
-        IDT[33].set_handler_fn(keyboard_handler); // IRQ1 = 33 après remap
-        IDT.load();
+        let idt_ptr = &raw mut IDT;
+        let idt = &mut *idt_ptr;
+
+        idt[33].set_handler_fn(keyboard_handler);
+        idt.load();
     }
 }
