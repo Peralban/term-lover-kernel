@@ -1,10 +1,8 @@
 
-mod cursor;
 
-use cursor::Cursor;
+use crate::session::desktop::content::terminal::cursor::Cursor;
 
-pub struct Terminal { // Root terminal (it can have child terminals inside it)
-    in_term: bool,
+pub struct Terminal {
     cursor: Cursor,
 
     start_x: i8,
@@ -12,13 +10,11 @@ pub struct Terminal { // Root terminal (it can have child terminals inside it)
     widht: i8,
     height: i8,
     wall_color: u8,
-    children: [Option<Terminal>; 4], // Max 4 child terminals (2 rows x 2 columns)
 }
 
 impl Terminal {
     pub fn new() -> Self {
-        Terminal { 
-            in_term: false,
+        Terminal {
             start_x: 0,
             start_y: 0,
             widht: 0,
