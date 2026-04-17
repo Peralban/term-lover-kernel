@@ -25,4 +25,15 @@ impl Render {
             }
         }
     }
+
+    pub fn all_white(&mut self) { //DEBUG
+        for y in 0..25 {
+            for x in 0..80 {
+                unsafe {
+                    *self.vga_buffer.offset((y * 80 + x) as isize * 2) = b'X'; // space character
+                    *self.vga_buffer.offset((y * 80 + x) as isize * 2 + 1) = 0x0f; // white color
+                }
+            }
+        }
+    }
 }
