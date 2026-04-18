@@ -68,24 +68,30 @@ impl TerminalBuffer {
             bgd_color,
 
             border,
-        }; 
-        for y in start_y..start_y + height { // PRIO CHANGER CA
+        };
+
+ 
+        for y in start_y..start_y + height {
+            let is_top = y == start_y;
+            let is_bottom = y == start_y + height - 1;
             for x in start_x..start_x + widht {
-                if y == start_y && x == start_x {
+                let is_left = x == start_x;
+                let is_right = x == start_x + widht - 1;
+                if is_top && is_left {
                     tb.buffer[y][x].set_cell(tb.border.top_left_corner, tb.border.top_color);
-                } else if y == start_y && x == start_x + widht - 1 {
+                } else if is_top && is_right {
                     tb.buffer[y][x].set_cell(tb.border.top_right_corner, tb.border.top_color);
-                } else if y == start_y + height - 1 && x == start_x {
+                } else if is_bottom && is_left {
                     tb.buffer[y][x].set_cell(tb.border.bot_left_corner, tb.border.bot_color);
-                } else if y == start_y + height - 1 && x == start_x + widht - 1 {
+                } else if is_bottom && is_right {
                     tb.buffer[y][x].set_cell(tb.border.bot_right_corner, tb.border.bot_color);
-                } else if y == start_y {
+                } else if is_top {
                     tb.buffer[y][x].set_cell(tb.border.top_walls, tb.border.top_color);
-                } else if y == start_y + height - 1 {
+                } else if is_bottom {
                     tb.buffer[y][x].set_cell(tb.border.bot_walls, tb.border.bot_color);
-                } else if x == start_x {
+                } else if is_left {
                     tb.buffer[y][x].set_cell(tb.border.left_walls, tb.border.left_color);
-                } else if x == start_x + widht - 1 {
+                } else if is_right {
                     tb.buffer[y][x].set_cell(tb.border.right_walls, tb.border.right_color);
                 }
             }
