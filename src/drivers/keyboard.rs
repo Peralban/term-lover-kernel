@@ -20,7 +20,7 @@ pub extern "x86-interrupt" fn keyboard_handler(
     }
 }
 
-static mut KEYBOARD_STATE: KeyboardState = KeyboardState {
+pub static mut KEYBOARD_STATE: KeyboardState = KeyboardState {
     shift: false,
     ctrl: false,
     alt: false,
@@ -29,11 +29,11 @@ static mut KEYBOARD_STATE: KeyboardState = KeyboardState {
 };
 
 pub struct KeyboardState {
-    shift: bool,
-    ctrl: bool,
-    alt: bool,
-    extended: bool,
-    super_key: bool,
+    pub shift: bool,
+    pub ctrl: bool,
+    pub alt: bool,
+    pub extended: bool,
+    pub super_key: bool,
 }
 
 #[derive(Copy, Clone)]
@@ -51,47 +51,56 @@ pub struct KeyEvent {
     pub mods: Modifiers,
 }
 
+pub struct KeyData {
+    pub key: u8,
+    pub p_or_r: bool, // true for press, false for release
+}
+
+pub fn change_state(key: u8, pressed: bool) {
+    unsafe {
+        match key {
+            0x2A => KEYBOARD_STATE.shift = pressed, // Shift
+            0x1D => KEYBOARD_STATE.ctrl = pressed,  // Ctrl
+            0x38 => KEYBOARD_STATE.alt = pressed,   // Alt
+            0x5B => KEYBOARD_STATE.super_key = pressed, // Super key
+            _ => {}
+        }
+    }
+}
+
 fn from_scancode(scancode: u8) -> Option<Event> {
     unsafe {
-        match scancode { // todo Delete ca et handle release
-            0x2A => { KEYBOARD_STATE.shift = true; return None; } // shift press
-            0xAA => { KEYBOARD_STATE.shift = false; return None; } // shift release
-            0x1D => { KEYBOARD_STATE.ctrl = true; return None; } // ctrl press
-            0x9D => { KEYBOARD_STATE.ctrl = false; return None; } // ctrl release
-            0x38 => { KEYBOARD_STATE.alt = true; return None; } // alt press
-            0xB8 => { KEYBOARD_STATE.alt = false; return None; } // alt release
+        match scancode {
             0xE0 => { KEYBOARD_STATE.extended = true; return None; } // extended
-
             _ => {}
         }
 
         if KEYBOARD_STATE.extended {
             KEYBOARD_STATE.extended = false;
-            match scancode {
-                0x5B => { KEYBOARD_STATE.super_key = true; return None; } // super key press
-                0xDB => { KEYBOARD_STATE.super_key = false; return None; } // super key release
-                _ => {}
-            }
-            let extended_key = decode_pressed_extended_key(scancode);
-            if extended_key != 0 {
-                return Some(Event::Input(InputEvent::KeyPress(KeyEvent {
-                    key: extended_key,
-                    mods: Modifiers {
-                        shift: KEYBOARD_STATE.shift,
-                        ctrl: KEYBOARD_STATE.ctrl,
-                        alt: KEYBOARD_STATE.alt,
-                        super_key: KEYBOARD_STATE.super_key,
-                        extended: true,
-                    }
-                })));
-            }
-            return None;    
+            let data = decode_extended_key(scancode);
+            let key_event = KeyEvent {
+                key: data.key,
+                mods: Modifiers {
+                    shift: KEYBOARD_STATE.shift,
+                    ctrl: KEYBOARD_STATE.ctrl,
+                    alt: KEYBOARD_STATE.alt,
+                    super_key: KEYBOARD_STATE.super_key,
+                    extended: false,
+                }
+            };
+
+            let ie = if data.p_or_r {
+                InputEvent::KeyPress(key_event)
+            } else {
+                InputEvent::KeyRelease(key_event)
+            };
+
+            return Some(Event::Input(ie));
         }
 
-        let key = decode_pressed_key(scancode);
-
-        Some(Event::Input(InputEvent::KeyPress(KeyEvent {
-            key,
+        let data = decode_key(scancode);
+        let key_event = KeyEvent {
+            key: data.key,
             mods: Modifiers {
                 shift: KEYBOARD_STATE.shift,
                 ctrl: KEYBOARD_STATE.ctrl,
@@ -99,88 +108,181 @@ fn from_scancode(scancode: u8) -> Option<Event> {
                 super_key: KEYBOARD_STATE.super_key,
                 extended: false,
             }
-        })))
+        };
+
+        let ie = if data.p_or_r {
+            InputEvent::KeyPress(key_event)
+        } else {
+            InputEvent::KeyRelease(key_event)
+        };
+
+        Some(Event::Input(ie))
     }
 }
 
-fn decode_pressed_key(scancode: u8) -> u8 {
+fn decode_key(scancode: u8) -> KeyData {
     match scancode {
+        // Pressed keys
         // Number row
-        0x02 => b'1',
-        0x03 => b'2',
-        0x04 => b'3',
-        0x05 => b'4',
-        0x06 => b'5',
-        0x07 => b'6',
-        0x08 => b'7',
-        0x09 => b'8',
-        0x0a => b'9',
-        0x0b => b'0',
-        0x0c => b'-',
-        0x0d => b'=',
+        0x02 => KeyData { key: b'1', p_or_r: true },
+        0x03 => KeyData { key: b'2', p_or_r: true },
+        0x04 => KeyData { key: b'3', p_or_r: true },
+        0x05 => KeyData { key: b'4', p_or_r: true },
+        0x06 => KeyData { key: b'5', p_or_r: true },
+        0x07 => KeyData { key: b'6', p_or_r: true },
+        0x08 => KeyData { key: b'7', p_or_r: true },
+        0x09 => KeyData { key: b'8', p_or_r: true },
+        0x0a => KeyData { key: b'9', p_or_r: true },
+        0x0b => KeyData { key: b'0', p_or_r: true },
+        0x0c => KeyData { key: b'-', p_or_r: true },
+        0x0d => KeyData { key: b'=', p_or_r: true },
         // Top letter row
-        0x10 => b'q',
-        0x11 => b'w',
-        0x12 => b'e',
-        0x13 => b'r',
-        0x14 => b't',
-        0x15 => b'y',
-        0x16 => b'u',
-        0x17 => b'i',
-        0x18 => b'o',
-        0x19 => b'p',
-        0x1a => b'[',
-        0x1b => b']',
-        0x2b => b'\\',
+        0x10 => KeyData { key: b'q', p_or_r: true },
+        0x11 => KeyData { key: b'w', p_or_r: true },
+        0x12 => KeyData { key: b'e', p_or_r: true },
+        0x13 => KeyData { key: b'r', p_or_r: true },
+        0x14 => KeyData { key: b't', p_or_r: true },
+        0x15 => KeyData { key: b'y', p_or_r: true },
+        0x16 => KeyData { key: b'u', p_or_r: true },
+        0x17 => KeyData { key: b'i', p_or_r: true },
+        0x18 => KeyData { key: b'o', p_or_r: true },
+        0x19 => KeyData { key: b'p', p_or_r: true },
+        0x1a => KeyData { key: b'[', p_or_r: true },
+        0x1b => KeyData { key: b']', p_or_r: true },
+        0x2b => KeyData { key: b'\\', p_or_r: true },
         // Middle letter row
-        0x1e => b'a',
-        0x1f => b's',
-        0x20 => b'd',
-        0x21 => b'f',
-        0x22 => b'g',
-        0x23 => b'h',
-        0x24 => b'j',
-        0x25 => b'k',
-        0x26 => b'l',
-        0x27 => b';',
-        0x28 => b'\'',
+        0x1e => KeyData { key: b'a', p_or_r: true },
+        0x1f => KeyData { key: b's', p_or_r: true },
+        0x20 => KeyData { key: b'd', p_or_r: true },
+        0x21 => KeyData { key: b'f', p_or_r: true },
+        0x22 => KeyData { key: b'g', p_or_r: true },
+        0x23 => KeyData { key: b'h', p_or_r: true },
+        0x24 => KeyData { key: b'j', p_or_r: true },
+        0x25 => KeyData { key: b'k', p_or_r: true },
+        0x26 => KeyData { key: b'l', p_or_r: true },
+        0x27 => KeyData { key: b';', p_or_r: true },
+        0x28 => KeyData { key: b'\'', p_or_r: true },
         // Bottom letter row
-        0x2c => b'z',
-        0x2d => b'x',
-        0x2e => b'c',
-        0x2f => b'v',
-        0x30 => b'b',
-        0x31 => b'n',
-        0x32 => b'm',
-        0x33 => b',',
-        0x34 => b'.',
-        0x35 => b'/',
+        0x2c => KeyData { key: b'z', p_or_r: true },
+        0x2d => KeyData { key: b'x', p_or_r: true },
+        0x2e => KeyData { key: b'c', p_or_r: true },
+        0x2f => KeyData { key: b'v', p_or_r: true },
+        0x30 => KeyData { key: b'b', p_or_r: true },
+        0x31 => KeyData { key: b'n', p_or_r: true },
+        0x32 => KeyData { key: b'm', p_or_r: true },
+        0x33 => KeyData { key: b',', p_or_r: true },
+        0x34 => KeyData { key: b'.', p_or_r: true },
+        0x35 => KeyData { key: b'/', p_or_r: true },
         // Space and enter
-        0x39 => b' ',
-        0x1c => b'\n',
-        _ => 0,
+        0x39 => KeyData { key: b' ', p_or_r: true },
+        0x1c => KeyData { key: b'\n', p_or_r: true },
+        0x0e => KeyData { key: 0x08, p_or_r: true }, // Backspace character
+        0x0f => KeyData { key: b'\t', p_or_r: true },
+        0x29 => KeyData { key: b'`', p_or_r: true },
+        // special keys
+        0x2A => KeyData { key: 0x2A, p_or_r: true }, // Shift press
+        0x1D => KeyData { key: 0x1D, p_or_r: true }, // Ctrl press
+        0x38 => KeyData { key: 0x38, p_or_r: true }, // Alt press
+
+        // Released keys
+        0x82 => KeyData { key: b'1', p_or_r: false },
+        0x83 => KeyData { key: b'2', p_or_r: false },
+        0x84 => KeyData { key: b'3', p_or_r: false },
+        0x85 => KeyData { key: b'4', p_or_r: false },
+        0x86 => KeyData { key: b'5', p_or_r: false },
+        0x87 => KeyData { key: b'6', p_or_r: false },
+        0x88 => KeyData { key: b'7', p_or_r: false },
+        0x89 => KeyData { key: b'8', p_or_r: false },
+        0x8a => KeyData { key: b'9', p_or_r: false },
+        0x8b => KeyData { key: b'0', p_or_r: false },
+        0x8c => KeyData { key: b'-', p_or_r: false },
+        0x8d => KeyData { key: b'=', p_or_r: false },
+        0x90 => KeyData { key: b'q', p_or_r: false },
+        0x91 => KeyData { key: b'w', p_or_r: false },
+        0x92 => KeyData { key: b'e', p_or_r: false },
+        0x93 => KeyData { key: b'r', p_or_r: false },
+        0x94 => KeyData { key: b't', p_or_r: false },
+        0x95 => KeyData { key: b'y', p_or_r: false },
+        0x96 => KeyData { key: b'u', p_or_r: false },
+        0x97 => KeyData { key: b'i', p_or_r: false },
+        0x98 => KeyData { key: b'o', p_or_r: false },
+        0x99 => KeyData { key: b'p', p_or_r: false },
+        0x9a => KeyData { key: b'[', p_or_r: false },
+        0x9b => KeyData { key: b']', p_or_r: false },
+        0xab => KeyData { key: b'\\', p_or_r: false },
+        0x9e => KeyData { key: b'a', p_or_r: false },
+        0x9f => KeyData { key: b's', p_or_r: false },
+        0xa0 => KeyData { key: b'd', p_or_r: false },
+        0xa1 => KeyData { key: b'f', p_or_r: false },
+        0xa2 => KeyData { key: b'g', p_or_r: false },
+        0xa3 => KeyData { key: b'h', p_or_r: false },
+        0xa4 => KeyData { key: b'j', p_or_r: false },
+        0xa5 => KeyData { key: b'k', p_or_r: false },
+        0xa6 => KeyData { key: b'l', p_or_r: false },
+        0xa7 => KeyData { key: b';', p_or_r: false },
+        0xa8 => KeyData { key: b'\'', p_or_r: false },
+        0xac => KeyData { key: b'z', p_or_r: false },
+        0xad => KeyData { key: b'x', p_or_r: false },
+        0xae => KeyData { key: b'c', p_or_r: false },
+        0xaf => KeyData { key: b'v', p_or_r: false },
+        0xb0 => KeyData { key: b'b', p_or_r: false },
+        0xb1 => KeyData { key: b'n', p_or_r: false },
+        0xb2 => KeyData { key: b'm', p_or_r: false },
+        0xb3 => KeyData { key: b',', p_or_r: false },
+        0xb4 => KeyData { key: b'.', p_or_r: false },
+        0xb5 => KeyData { key: b'/', p_or_r: false },
+        0xb9 => KeyData { key: b' ', p_or_r: false },
+        0x9c => KeyData { key: b'\n', p_or_r: false },
+        0x8e => KeyData { key: 0x08, p_or_r: false }, // Backspace character
+        0x8f => KeyData { key: b'\t', p_or_r: false },
+        0xa9 => KeyData { key: b'`', p_or_r: false },
+        0xAA => KeyData { key: 0x2A, p_or_r: false }, // Shift release
+        0x9D => KeyData { key: 0x1D, p_or_r: false }, // Ctrl release
+        0xB8 => KeyData { key: 0x38, p_or_r: false }, // Alt release
+
+        _ => KeyData { key: 0, p_or_r: false }, // Unknown key
     }
 }
 
-fn decode_pressed_extended_key(scancode: u8) -> u8 {
+fn decode_extended_key(scancode: u8) -> KeyData {
     match scancode {
+        // pressed keys
         // numpad keys
-        0x35 => b'/',  // Numpad slash
-        0x37 => b'*',  // Numpad asterisk
-        0x38 => b'-',  // Numpad minus
-        0x39 => b'+',  // Numpad plus
+        0x35 => KeyData { key: b'/', p_or_r: true },  // Numpad slash
+        0x37 => KeyData { key: b'*', p_or_r: true },  // Numpad asterisk
+        0x38 => KeyData { key: b'-', p_or_r: true },  // Numpad minus
+        0x39 => KeyData { key: b'+', p_or_r: true },  // Numpad plus
         // arrow keys
-        0x48 => b'U',  // Up arrow
-        0x50 => b'D',  // Down arrow
-        0x4b => b'L',  // Left arrow
-        0x4d => b'R',  // Right arrow
+        0x48 => KeyData { key: b'U', p_or_r: true },  // Up arrow
+        0x50 => KeyData { key: b'D', p_or_r: true },  // Down arrow
+        0x4b => KeyData { key: b'L', p_or_r: true },  // Left arrow
+        0x4d => KeyData { key: b'R', p_or_r: true },  // Right arrow
         // other
-        0x1c => b'\n', // Enter
-        0x1d => b'\t', // Tab
-        0x47 => b'H',  // Home
-        0x4f => b'E',  // End
-        0x49 => b'P',  // Page Up
-        0x51 => b'N',  // Page Down
-        _ => 0,
+        0x1c => KeyData { key: b'\n', p_or_r: true }, // Enter
+        0x1d => KeyData { key: 0x1D, p_or_r: true }, // Ctrl press (right)
+        0x47 => KeyData { key: b'H', p_or_r: true },  // Home
+        0x4f => KeyData { key: b'F', p_or_r: true },  // End
+        0x49 => KeyData { key: b'P', p_or_r: true },  // Page Up
+        0x51 => KeyData { key: b'N', p_or_r: true },  // Page Down
+        // super key
+        0x5B => KeyData { key: 0x5B, p_or_r: true }, // Super key press
+
+        // released keys
+        0xB5 => KeyData { key: b'/', p_or_r: false },  // Numpad slash release
+        0xB7 => KeyData { key: b'*', p_or_r: false },  // Numpad asterisk release
+        0xB8 => KeyData { key: b'-', p_or_r: false },  // Numpad minus release
+        0xB9 => KeyData { key: b'+', p_or_r: false },  // Numpad plus release
+        0xC8 => KeyData { key: b'U', p_or_r: false },  // Up arrow release
+        0xD0 => KeyData { key: b'D', p_or_r: false },  // Down arrow release
+        0xCB => KeyData { key: b'L', p_or_r: false },  // Left arrow release
+        0xCD => KeyData { key: b'R', p_or_r: false },  // Right arrow release
+        0x9C => KeyData { key: b'\n', p_or_r: false }, // Enter release
+        0x9D => KeyData { key: 0x1D, p_or_r: false }, // Ctrl release (right)
+        0xC7 => KeyData { key: b'H', p_or_r: false },  // Home release
+        0xCF => KeyData { key: b'F', p_or_r: false },  // End release
+        0xC9 => KeyData { key: b'P', p_or_r: false },  // Page Up release
+        0xD1 => KeyData { key: b'N', p_or_r: false },  // Page Down release
+        0xDB => KeyData { key: 0x5B, p_or_r: false }, // Super key release
+        _ => KeyData { key: 0, p_or_r: false }, // Unknown key
     }
 }

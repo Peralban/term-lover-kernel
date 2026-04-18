@@ -1,6 +1,8 @@
 
 use crate::EVENT_QUEUE;
+use crate::drivers::keyboard::KEYBOARD_STATE;
 use crate::drivers::keyboard::KeyEvent;
+use crate::drivers::keyboard::change_state;
 use crate::events::events::Event;
 use crate::events::events::InputEvent;
 use crate::events::events::Event_Return;
@@ -24,6 +26,17 @@ fn determine_case(shift: bool, key: u8) -> u8 {
             b'8' => b'*',
             b'9' => b'(',
             b'0' => b')',
+            b'-' => b'_',
+            b'=' => b'+',
+            b'[' => b'{',
+            b']' => b'}',
+            b'\\' => b'|',
+            b';' => b':',
+            b'\'' => b'"',
+            b',' => b'<',
+            b'.' => b'>',
+            b'/' => b'?',
+            b'`' => b'~',
             _ => key,
         }
     } else {
@@ -32,6 +45,10 @@ fn determine_case(shift: bool, key: u8) -> u8 {
 }
 
 fn kp_event_builder(_event: KeyEvent) -> Event_Return {
+    if _event.key == 0x2A || _event.key == 0x1D || _event.key == 0x38 || _event.key == 0x5B {
+        change_state(_event.key, true);
+        return Event_Return::NoVisualChange;
+    }
     if !(_event.mods.ctrl && _event.mods.alt && _event.mods.super_key) && !_event.mods.extended && matches!(_event.key, 32..=126) {
         EVENT_QUEUE.lock().push(
             Some(Event::UI(UiEvent::App(AppEvent::WriteAscii(WriteEvent {
@@ -40,7 +57,7 @@ fn kp_event_builder(_event: KeyEvent) -> Event_Return {
         );
     }
     if _event.mods.extended {
-        match _event.key { // TODO simplify
+        match _event.key {
             b'U' => { EVENT_QUEUE.lock().push(
                 Some(Event::UI(UiEvent::App(AppEvent::MoveCursor(MoveCursorEvent { 
                     direction: Direction::Up,
@@ -68,6 +85,9 @@ fn kp_event_builder(_event: KeyEvent) -> Event_Return {
 }
 
 fn kr_event_builder(_event: KeyEvent) -> Event_Return {
+    if _event.key == 0x2A || _event.key == 0x1D || _event.key == 0x38 || _event.key == 0x5B {
+        change_state(_event.key, false);
+    }
     Event_Return::NoVisualChange
 }
 
