@@ -1,5 +1,5 @@
 
-use crate::shell::command::Command;
+use crate::session::desktop::content::terminal::shell::command::Command;
 
 #[repr(C)]
 pub struct CommandEntry {
