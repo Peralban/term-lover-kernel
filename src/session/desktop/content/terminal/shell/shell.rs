@@ -1,8 +1,7 @@
 
-use crate::shell::terminal::Terminal;
-use crate::shell::utils;
-use crate::shell::command::Command;
-use crate::shell::command_register::CommandEntry;
+use crate::utils::lib::{my_split::my_split, bytes_cmp::bytes_cmp};
+use crate::session::desktop::content::terminal::shell::command::Command;
+use crate::session::desktop::content::terminal::shell::command_register::CommandEntry;
 
 #[warn(improper_ctypes)]
 unsafe extern "C" {
@@ -13,9 +12,6 @@ unsafe extern "C" {
 pub struct Shell {
     buffer: [u8; 256],
     len: usize,
-
-    cmd: Command,
-    term: Terminal,
 }
 
 impl Shell {
@@ -23,8 +19,6 @@ impl Shell {
         Shell {
             buffer: [0; 256],
             len: 0,
-            cmd: Command::new([[0; 32]; 8],0),
-            term: Terminal::new(),
         }
     }
 
@@ -42,14 +36,10 @@ impl Shell {
         }
     }
 
-    // fn cmd_create_terminal(_cmd: &Command) {}
-
-    // fn cmd_exit(_cmd: &Command) {}
-
     fn execute_cmd(&mut self) {
-        let (cmd_array, array_len) = utils::my_split(&self.buffer, self.len, b' ');
-        self.cmd = Command::new(cmd_array, array_len);
-        let cmd_name = &self.cmd.get_arg()[0];
+        let (cmd_array, array_len) = my_split(&self.buffer, self.len, b' ');
+        let cmd = Command::new(cmd_array, array_len);
+        let cmd_name = cmd.get_arg()[0];
 
         unsafe {
             let mut ptr = &__start_commands as *const CommandEntry;
@@ -58,14 +48,13 @@ impl Shell {
             while ptr < end {
                 let entry = &*ptr;
 
-                if utils::bytes_cmp(cmd_name, entry.get_name()) {
-                    entry.get_func()(&self.cmd);
+                if bytes_cmp(&cmd_name, entry.get_name()) {
+                    entry.get_func()(&cmd);
                     return;
                 }
 
                 ptr = ptr.add(1);
             }
         }
-
     }
 }
