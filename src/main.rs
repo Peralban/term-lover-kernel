@@ -31,6 +31,12 @@ fn pop_event() -> Option<Event> {
     })
 }
 
+pub fn push_event(event: Event) {
+    interrupts::without_interrupts(|| {
+        EVENT_QUEUE.lock().push(event);
+    })
+}
+
 fn init() {
     interrupt::init_idt();
     pic::init();
@@ -46,7 +52,9 @@ pub extern "C" fn _start() -> ! {
     let mut session = Dirty::new(Session::new(), Event_Return::VisualChange);
     loop {
         while let Some(_event) = pop_event() {
-            *session.changed() = session.value().dispatch_events(_event); // next TODO
+            if session.value().dispatch_events(_event).as_bool() {
+                *session.changed() = Event_Return::VisualChange;
+            }
         }
         if session.changed().as_bool() {
             session.value().get_current_desktop().update_screen();

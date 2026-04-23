@@ -18,7 +18,7 @@ pub struct AppManager {
 impl AppManager {
     pub fn new() -> Self {
         AppManager { 
-            apps: [Some(App::Terminal(Terminal::new(0, 0, 80, 25, 0, 0x0f))), None, None, None],
+            apps: [Some(App::Terminal(Terminal::new(0, 0, 80, 25, b' ', 0x0f))), None, None, None],
             focus: 0,
         }
     }

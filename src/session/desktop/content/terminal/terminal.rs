@@ -1,6 +1,7 @@
 
-use crate::{EVENT_QUEUE, events::events::{Event, Event_Return, UiEvent}, session::desktop::content::{app_events::{Direction, MoveCursorEvent, WriteEvent}, app_manager::AppEvent, terminal::cursor::{self, Cursor}}};
+use crate::{events::events::{Event, Event_Return, UiEvent}, push_event, session::desktop::content::{app_events::{Direction, MoveCursorEvent, WriteEvent}, app_manager::AppEvent, terminal::{cursor::Cursor, shell::shell::Shell}}};
 use crate::utils::cell::Cell;
+use crate::session::desktop::content::terminal::shell::shell;
 
 struct TerminalBorder {
     pub top_left_corner: u8,
@@ -42,7 +43,7 @@ impl TerminalBorder {
 
 struct TerminalBuffer {
     border: TerminalBorder,
-    
+
     start_x: usize,
     start_y: usize,
     widht: usize,
@@ -107,6 +108,10 @@ impl TerminalBuffer {
         &self.buffer
     }
 
+    pub fn write_cell(&mut self, x: usize, y: usize, ascii: u8) {
+        self.buffer[y][x].set_cell(ascii, self.bgd_color);
+    }
+
     pub fn get_border(&self) -> &TerminalBorder {
         &self.border
     }
@@ -134,7 +139,7 @@ pub struct Terminal {
 
     buffer: TerminalBuffer,
 
-
+    shell: Shell,
     have_history: bool, // futur: SHELL 
 }
 
@@ -145,18 +150,17 @@ impl Terminal {
 
             buffer: TerminalBuffer::new(TerminalBorder::new(), bgd_ascii, bgd_color, start_x, start_y, widht, height),
 
+            shell: Shell::new(),
 
             have_history: false,
         }
     }
 
     pub fn write_ascii(&mut self, we: WriteEvent) -> Event_Return {
-        *self.buffer.get_buffer_mut()[self.cursor.y][self.cursor.x].get_ascii_mut() = we.ascii;
-        EVENT_QUEUE.lock().push(
-            Some(Event::UI(UiEvent::App(AppEvent::MoveCursor(MoveCursorEvent { 
-                direction: Direction::Right,
-            }))))
-        );
+        self.buffer.write_cell(self.cursor.x, self.cursor.y, we.ascii);
+        push_event(Event::UI(UiEvent::App(AppEvent::MoveCursor(MoveCursorEvent {
+            direction: Direction::Right,
+        }))));
         Event_Return::VisualChange
     }
 

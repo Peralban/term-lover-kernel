@@ -3,7 +3,7 @@ use x86_64::instructions::port::Port;
 use x86_64::structures::idt::InterruptStackFrame;
 use crate::events::events::Event;
 use crate::events::events::InputEvent;
-use crate::EVENT_QUEUE;
+use crate::push_event;
 
 pub extern "x86-interrupt" fn keyboard_handler(
     _stack_frame: InterruptStackFrame
@@ -13,7 +13,9 @@ pub extern "x86-interrupt" fn keyboard_handler(
         data.read()
     };
 
-    EVENT_QUEUE.lock().push(from_scancode(scancode));
+    if let Some(event) = from_scancode(scancode) {
+        push_event(event);
+    }
 
     unsafe {
         Port::new(0x20).write(0x20u8); // EOI
@@ -74,43 +76,30 @@ fn from_scancode(scancode: u8) -> Option<Event> {
             0xE0 => { KEYBOARD_STATE.extended = true; return None; } // extended
             _ => {}
         }
-
-        if KEYBOARD_STATE.extended {
-            KEYBOARD_STATE.extended = false;
-            let data = decode_extended_key(scancode);
-            let key_event = KeyEvent {
-                key: data.key,
-                mods: Modifiers {
-                    shift: KEYBOARD_STATE.shift,
-                    ctrl: KEYBOARD_STATE.ctrl,
-                    alt: KEYBOARD_STATE.alt,
-                    super_key: KEYBOARD_STATE.super_key,
-                    extended: false,
-                }
-            };
-
-            let ie = if data.p_or_r {
-                InputEvent::KeyPress(key_event)
-            } else {
-                InputEvent::KeyRelease(key_event)
-            };
-
-            return Some(Event::Input(ie));
-        }
-
-        let data = decode_key(scancode);
-        let key_event = KeyEvent {
-            key: data.key,
-            mods: Modifiers {
-                shift: KEYBOARD_STATE.shift,
-                ctrl: KEYBOARD_STATE.ctrl,
-                alt: KEYBOARD_STATE.alt,
-                super_key: KEYBOARD_STATE.super_key,
-                extended: false,
-            }
+        let key_event: KeyEvent;
+        let data: KeyData;
+        let ie: InputEvent;
+        let mods = Modifiers {
+            shift: KEYBOARD_STATE.shift,
+            ctrl: KEYBOARD_STATE.ctrl,
+            alt: KEYBOARD_STATE.alt,
+            super_key: KEYBOARD_STATE.super_key,
+            extended: KEYBOARD_STATE.extended,
         };
 
-        let ie = if data.p_or_r {
+        data = if KEYBOARD_STATE.extended {
+            KEYBOARD_STATE.extended = false;
+            decode_extended_key(scancode)
+        } else {
+            decode_key(scancode)
+        };
+
+        key_event = KeyEvent {
+            key: data.key,
+            mods: mods
+        };
+
+        ie = if data.p_or_r {
             InputEvent::KeyPress(key_event)
         } else {
             InputEvent::KeyRelease(key_event)

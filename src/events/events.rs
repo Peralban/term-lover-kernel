@@ -62,14 +62,14 @@ impl EventQueue {
         })
     }
 
-    pub fn push(&mut self, event: Option<Event>) {
+    pub fn push(&mut self, event: Event) {
         let next = (self.tail + 1) % 256;
 
         if next == self.head {
             return;
         }
 
-        self.events[self.tail] = event;
+        self.events[self.tail] = Some(event);
         self.tail = next;
     }
 }

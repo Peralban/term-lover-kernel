@@ -1,6 +1,5 @@
 
-use crate::EVENT_QUEUE;
-use crate::drivers::keyboard::KEYBOARD_STATE;
+use crate::push_event;
 use crate::drivers::keyboard::KeyEvent;
 use crate::drivers::keyboard::change_state;
 use crate::events::events::Event;
@@ -50,34 +49,24 @@ fn kp_event_builder(_event: KeyEvent) -> Event_Return {
         return Event_Return::NoVisualChange;
     }
     if !(_event.mods.ctrl && _event.mods.alt && _event.mods.super_key) && !_event.mods.extended && matches!(_event.key, 32..=126) {
-        EVENT_QUEUE.lock().push(
-            Some(Event::UI(UiEvent::App(AppEvent::WriteAscii(WriteEvent {
-                ascii: determine_case(_event.mods.shift, _event.key),
-            }))))
-        );
+        push_event(Event::UI(UiEvent::App(AppEvent::WriteAscii(WriteEvent {
+            ascii: determine_case(_event.mods.shift, _event.key),
+        }))));
     }
     if _event.mods.extended {
         match _event.key {
-            b'U' => { EVENT_QUEUE.lock().push(
-                Some(Event::UI(UiEvent::App(AppEvent::MoveCursor(MoveCursorEvent { 
-                    direction: Direction::Up,
-                }))))
-            ); return Event_Return::VisualChange },
-            b'D' => { EVENT_QUEUE.lock().push(
-                Some(Event::UI(UiEvent::App(AppEvent::MoveCursor(MoveCursorEvent { 
-                    direction: Direction::Down,
-                }))))
-            ); return Event_Return::VisualChange },
-            b'L' => { EVENT_QUEUE.lock().push(
-                Some(Event::UI(UiEvent::App(AppEvent::MoveCursor(MoveCursorEvent { 
-                    direction: Direction::Left,
-                }))))
-            ); return Event_Return::VisualChange },
-            b'R' => { EVENT_QUEUE.lock().push(
-                Some(Event::UI(UiEvent::App(AppEvent::MoveCursor(MoveCursorEvent { 
-                    direction: Direction::Right,
-                }))))
-            ); return Event_Return::VisualChange },
+            b'U' => { push_event(Event::UI(UiEvent::App(AppEvent::MoveCursor(MoveCursorEvent {
+                direction: Direction::Up,
+            })))); return Event_Return::VisualChange },
+            b'D' => { push_event(Event::UI(UiEvent::App(AppEvent::MoveCursor(MoveCursorEvent {
+                direction: Direction::Down,
+            })))); return Event_Return::VisualChange },
+            b'L' => { push_event(Event::UI(UiEvent::App(AppEvent::MoveCursor(MoveCursorEvent {
+                direction: Direction::Left,
+            })))); return Event_Return::VisualChange },
+            b'R' => { push_event(Event::UI(UiEvent::App(AppEvent::MoveCursor(MoveCursorEvent {
+                direction: Direction::Right,
+            })))); return Event_Return::VisualChange },
             _ => {}
         }
     }
